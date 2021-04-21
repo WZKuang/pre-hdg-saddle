@@ -1,5 +1,5 @@
 # Solves - Lap u + tau u - grad p = 1 on [0,1]^d
-#                           div u = 0
+#                  div u + ilam p= 0
 # ngsolve-imports
 from ngsolve.krylovspace import MinRes
 from ngsolve.meshes import *
@@ -165,7 +165,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=0, ilam=1, hd=True, red=True,
 
         # M - mass matrix on W0(p0)
         M = BilinearForm(W0)
-        M += (1+ilam)*p0*q0*dx
+        M += (2+ilam)*p0*q0*dx
         
         N = BilinearForm(W0)
         N += 1/h*(p0-p0.Other())*(q0-q0.Other())*dx(skeleton=True)
@@ -254,9 +254,9 @@ def SolveProblem(order=1, refines=3, dim=3, tau=0, ilam=1, hd=True, red=True,
 
 ############### parameters
 dimList = [2]
-orderList = [1, 3,5]
-ilamList = [1e-4, 1]
-refines = 4
+orderList = [2,4,6]
+ilamList = [1e-4,1e-1,1]
+refines = 1
 
 for dim in dimList:
     for order in orderList:

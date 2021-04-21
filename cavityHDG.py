@@ -20,11 +20,11 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         if dim==2:
             nx = 8*2**i
             mesh = MakeStructured2DMesh(quads=False, nx=nx, ny = nx)
-            utop = CoefficientFunction((1,0))
+            utop = CoefficientFunction((4*x*(1-x),0))
         else:
             nx = 8*(i+1)
             mesh = MakeStructured3DMesh(hexes=False, nx=nx, ny = nx, nz = nx)
-            utop = CoefficientFunction((1,0,0))
+            utop = CoefficientFunction((16*x*(1-x)*y*(1-y),0,0))
         t1 = timeit.time()
         print("\nOrder: ", order, "LVL: ", i, " DIM: ", dim, " TAU: ", tau)
         print("projected_jumps: ", hd, "  ho_div_free: ", red)
@@ -49,11 +49,11 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         u0, v0 = V0.TnT()
 
         # gradient by row
-        gradv, gradu = Grad(v), Grad(u)
+        #gradv, gradu = Grad(v), Grad(u)
+        gradv, gradu = Sym(Grad(v)), Sym(Grad(u))
         
         # RHS (constant) 
         f = LinearForm (fes)
-        #f += (v[0]+v[1])*dx
 
         # normal direction and mesh size
         n = specialcf.normal(mesh.dim)
@@ -71,10 +71,10 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         ########### HDG operator ah
         a = BilinearForm (fes, symmetric=True, condense=True)
         # volume term
-        a += (InnerProduct(gradu,gradv)+tau*u*v
+        a += (2*InnerProduct(gradu,gradv)+tau*u*v
                 -div(u)*q-div(v)*p)*dx
         # bdry terms
-        a += (-gradu*n*tang(v-vhat)-gradv*n*tang(u-uhat)
+        a += 2*(-gradu*n*tang(v-vhat)-gradv*n*tang(u-uhat)
                 +alpha*tang(u-uhat)*tang(v-vhat))*dx(element_boundary=True)
 
         
@@ -220,7 +220,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             if tau ==0: 
                 preP = Ep @ M_inv @ EpT
             else:
-                preP = Ep @ (M_inv+tau*N_inv) @ EpT
+                preP = Ep @ (2*M_inv+tau*N_inv) @ EpT
 
             PREC = preU + preP
             t2 = timeit.time()
@@ -251,8 +251,8 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
 
 
 ############### parameters
-dimList = [3]#2
-orderList = [1,3,5]
+dimList = [2]
+orderList = [2,4,6]
 tauList = [0, 1, 100]
 refines = 4
 

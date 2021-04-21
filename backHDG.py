@@ -19,7 +19,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
     for i in range(refines):
         t0 = timeit.time()
         if dim==2:
-            h0 = 0.1/2**i
+            nx = 8*2**i
             ## Backwards-facing step flow geo
             geo = SplineGeometry()
             L = 5
@@ -31,7 +31,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             geo.Append(['line',pind[3],pind[4]],leftdomain=1,rightdomain=0,bc="inlet")
             geo.Append(['line',pind[4],pind[5]],leftdomain=1,rightdomain=0,bc="wall")
             geo.Append(['line',pind[5],pind[0]],leftdomain=1,rightdomain=0,bc="wall")
-            mesh = Mesh(geo.GenerateMesh(maxh=h0))
+            mesh = Mesh(geo.GenerateMesh(maxh=1./nx))
             uin = CoefficientFunction((4*(2-y)*(y-1),0))
         else:
             nx = 4*(i+1)
@@ -82,7 +82,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         print("\nOrder: ", order, "LVL: ", i, " DIM: ", dim, " TAU: ", tau)
         print("projected_jumps: ", hd, "  ho_div_free: ", red)
         print("\nElasped:%.2e MESHING "%(t1-t0))
-        
+         
         # Div-HDG spaces
         V = HDiv(mesh, order=order, hodivfree=red, dirichlet="wall|inlet")
         VF = TangentialFacetFESpace(mesh, order=order, 
@@ -102,7 +102,8 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         u0, v0 = V0.TnT()
 
         # gradient by row
-        gradv, gradu = Grad(v), Grad(u)
+        #gradv, gradu = Grad(v), Grad(u)
+        gradv, gradu = Sym(Grad(v)), Sym(Grad(u))
         
         # RHS (constant) 
         f = LinearForm (fes)
@@ -123,10 +124,10 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         ########### HDG operator ah
         a = BilinearForm (fes, symmetric=True, condense=True)
         # volume term
-        a += (InnerProduct(gradu,gradv)+tau*u*v
+        a += (2*InnerProduct(gradu,gradv)+tau*u*v
                 -div(u)*q-div(v)*p)*dx
         # bdry terms
-        a += (-gradu*n*tang(v-vhat)-gradv*n*tang(u-uhat)
+        a += 2*(-gradu*n*tang(v-vhat)-gradv*n*tang(u-uhat)
                 +alpha*tang(u-uhat)*tang(v-vhat))*dx(element_boundary=True)
 
         
@@ -273,7 +274,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             if tau ==0: 
                 preP = Ep @ M_inv @ EpT
             else:
-                preP = Ep @ (M_inv+tau*N_inv) @ EpT
+                preP = Ep @ (2*M_inv+tau*N_inv) @ EpT
 
             PREC = preU + preP
             t2 = timeit.time()
@@ -308,7 +309,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
 
 ############### parameters
 dimList = [2]
-orderList = [1, 3,5]
+orderList = [2,4,6]
 tauList = [0, 1, 100]
 refines = 4
 
