@@ -20,11 +20,11 @@ def SolveProblem(order=1, refines=3, dim=3, tau=0, ilam=1, hd=True, red=True,
         if dim==2:
             nx = 8*2**i
             mesh = MakeStructured2DMesh(quads=False, nx=nx, ny = nx)
-            utop = CoefficientFunction((1,0))
+            utop = CoefficientFunction((4*x*(1-x),0))
         else:
-            nx = 8*(i+1)
+            nx = 4*(i+1)
             mesh = MakeStructured3DMesh(hexes=False, nx=nx, ny = nx, nz = nx)
-            utop = CoefficientFunction((1,0,0))
+            utop = CoefficientFunction((16*x*(1-x)*y*(1-y),0,0))
         t1 = timeit.time()
         print("\nOrder: ", order, "LVL: ", i, " DIM: ", dim, " TAU: ", tau, 
                 "ILAM: ", ilam)
@@ -229,6 +229,15 @@ def SolveProblem(order=1, refines=3, dim=3, tau=0, ilam=1, hd=True, red=True,
             
             ### Boundary condition data
             uhath.Set(utop, definedon=mesh.Boundaries("top"))
+            # random initial value
+            from scipy import random
+            tmp = gfu.vec.CreateVector()
+            tmp.FV().NumPy()[:] = random.rand(fes.ndof)
+            gfu.vec.data += Projector(fes.FreeDofs(True), True) * tmp
+            if draw:
+                Draw(Norm(uh), mesh, "ini")
+                input("ini")
+
             f.vec.data = -a.mat * gfu.vec
 
             f.vec.data += a.harmonic_extension_trans * f.vec
@@ -254,7 +263,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=0, ilam=1, hd=True, red=True,
 
 ############### parameters
 dimList = [2]
-orderList = [2,4,6]
+orderList = [2,3,4]
 ilamList = [1e-4,1e-1,1]
 refines = 1
 

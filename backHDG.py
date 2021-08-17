@@ -18,12 +18,12 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         import netgen.gui
     for i in range(refines):
         t0 = timeit.time()
+        L = 4
         if dim==2:
             nx = 8*2**i
             ## Backwards-facing step flow geo
             geo = SplineGeometry()
-            L = 5
-            pnts = [(1,0),(L,0),(10,2),(0,2),(0,1),(1,1)]
+            pnts = [(0.5,0),(L,0),(L,1),(0,1),(0,0.5),(0.5,0.5)]
             pind = [geo.AppendPoint(*pnt) for pnt in pnts]
             geo.Append(['line',pind[0],pind[1]],leftdomain=1,rightdomain=0,bc="wall")
             geo.Append(['line',pind[1],pind[2]],leftdomain=1,rightdomain=0,bc="outlet")
@@ -32,52 +32,20 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             geo.Append(['line',pind[4],pind[5]],leftdomain=1,rightdomain=0,bc="wall")
             geo.Append(['line',pind[5],pind[0]],leftdomain=1,rightdomain=0,bc="wall")
             mesh = Mesh(geo.GenerateMesh(maxh=1./nx))
-            uin = CoefficientFunction((4*(2-y)*(y-1),0))
+            uin = CoefficientFunction((16*(1-y)*(y-0.5),0))
         else:
             nx = 4*(i+1)
-            L = 5
+            ## Backwards-facing step flow geo
             geo = CSGeometry()
-            geo.Add(OrthoBrick((0,1,0),(1,2,1)))
-            geo.Add(OrthoBrick((1,1,0),(L,2,1)))
-            geo.Add(OrthoBrick((1,0,0),(L,1,1)))
-            netmesh = geo.GenerateMesh(maxh=1./nx)
-            # boundary labels (complete) 
-            netmesh.SetBCName(0,"back")
-            netmesh.SetBCName(1,"inlet")
-            netmesh.SetBCName(2,"back")
-            netmesh.SetBCName(3,"outlet")
-            netmesh.SetBCName(4,"front")
-            netmesh.SetBCName(5,"bottom")
-            netmesh.SetBCName(6,"wally")
-            netmesh.SetBCName(7,"top")
-            netmesh.SetBCName(8,"outlet")
-            netmesh.SetBCName(9,"front")
-            netmesh.SetBCName(10,"back")
-            netmesh.SetBCName(11,"inner")
-            netmesh.SetBCName(12,"top")
-            netmesh.SetBCName(13,"inner")
-            netmesh.SetBCName(14,"top")
-            netmesh.SetBCName(15,"wallx")
             
-            # boundary labels (simplified) 
-            netmesh.SetBCName(0,"wall")
-            netmesh.SetBCName(1,"inlet")
-            netmesh.SetBCName(2,"wall")
-            netmesh.SetBCName(3,"outlet")
-            netmesh.SetBCName(4,"wall")
-            netmesh.SetBCName(5,"wall")
-            netmesh.SetBCName(6,"wall")
-            netmesh.SetBCName(7,"wall")
-            netmesh.SetBCName(8,"outlet")
-            netmesh.SetBCName(9,"wall")
-            netmesh.SetBCName(10,"wall")
-            netmesh.SetBCName(11,"inner")
-            netmesh.SetBCName(12,"wall")
-            netmesh.SetBCName(13,"inner")
-            netmesh.SetBCName(14,"wall")
-            netmesh.SetBCName(15,"wall")
-            mesh = Mesh(netmesh)
-            uin = CoefficientFunction((16*(2-y)*(y-1)*z*(1-z),0, 0))
+            left = Plane(Pnt(0,0,0),Vec(-1,0,0)).bc("inlet")
+            right = Plane(Pnt(L,0,0),Vec(1,0,0)).bc("outlet")
+            box1 = OrthoBrick(Pnt(-1,0,0),Pnt(L+1,1,1)).bc("wall")
+            box2 = OrthoBrick(Pnt(-1,-1,-1),Pnt(0.5,3,0.5)).bc("wall")
+            
+            geo.Add(box1*left*right-box2)
+            mesh = Mesh(geo.GenerateMesh(maxh=1./nx))
+            uin = CoefficientFunction((64*(1-z)*(z-0.5)*(1-y)*y,0,0))
         t1 = timeit.time()
         print("\nOrder: ", order, "LVL: ", i, " DIM: ", dim, " TAU: ", tau)
         print("projected_jumps: ", hd, "  ho_div_free: ", red)
@@ -167,7 +135,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
         nglobal = sum(fes.FreeDofs(True))
         print("Elasped:%.2e BLOCKING  Total DOFs: %.2e Global DOFs: %.2e "%(
             t0-t1, ntotal, nglobal))
-        
+        #continue
         class SymmetricGS(BaseMatrix):
               def __init__ (self, smoother):
                   super(SymmetricGS, self).__init__()
@@ -282,9 +250,14 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             
             ### Boundary condition data
             uh.Set(uin, definedon=mesh.Boundaries("inlet"))
-            ## FIXME : HACKING
-            uh0 = uh.vec.CreateVector()
-            uh0.data = uh.vec
+            # random initial value
+            from scipy import random
+            tmp = gfu.vec.CreateVector()
+            tmp.FV().NumPy()[:] = random.rand(fes.ndof)
+            gfu.vec.data += Projector(fes.FreeDofs(True), True) * tmp
+            if draw:
+                Draw(Norm(uh), mesh, "ini")
+                input("ini")
 
             f.vec.data = -a.mat * gfu.vec
             f.vec.data += a.harmonic_extension_trans * f.vec
@@ -309,12 +282,12 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
 
 ############### parameters
 dimList = [2]
-orderList = [2,4,6]
-tauList = [0, 1, 100]
+orderList = [2]#,3,4]
+tauList = [0]#, 1, 100]
 refines = 4
 
 for dim in dimList:
     for order in orderList:
         for tau in tauList:
             SolveProblem(order, refines, dim=dim, tau=tau, hd=True, red=True,
-                    pr=False,draw=False)
+                    pr=False,draw=True)

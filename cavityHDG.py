@@ -22,7 +22,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             mesh = MakeStructured2DMesh(quads=False, nx=nx, ny = nx)
             utop = CoefficientFunction((4*x*(1-x),0))
         else:
-            nx = 8*(i+1)
+            nx = 4*(i+1)
             mesh = MakeStructured3DMesh(hexes=False, nx=nx, ny = nx, nz = nx)
             utop = CoefficientFunction((16*x*(1-x)*y*(1-y),0,0))
         t1 = timeit.time()
@@ -40,6 +40,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             W = L2(mesh, order=order-1, lowest_order_wb=True)
 
         fes = FESpace([V, VF, W])
+        #fes.FreeDofs().Clear(V.ndof+VF.ndof)
         # aux H1 space
         V0 = VectorH1(mesh, order=1, dirichlet=".*")
         
@@ -228,6 +229,15 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             
             ### Boundary condition data
             uhath.Set(utop, definedon=mesh.Boundaries("top"))
+            # random initial value
+            from scipy import random
+            tmp = gfu.vec.CreateVector()
+            tmp.FV().NumPy()[:] = random.rand(fes.ndof)
+            gfu.vec.data += Projector(fes.FreeDofs(True), True) * tmp
+            if draw:
+                Draw(Norm(uh), mesh, "ini")
+                input("ini")
+
             f.vec.data = -a.mat * gfu.vec
 
             f.vec.data += a.harmonic_extension_trans * f.vec
@@ -237,6 +247,7 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             tol = max(1e-10,1e-8*error0)
             _, it = MinRes(mat=a.mat, pre=PREC, rhs=f.vec,sol=gfu.vec,
                       initialize=False, maxsteps=500,printrates=pr, tol=tol)
+            #gfu.vec.data += r
             gfu.vec.data += a.harmonic_extension * gfu.vec
             gfu.vec.data += a.inner_solve * f.vec
             t3 = timeit.time()
@@ -246,13 +257,13 @@ def SolveProblem(order=1, refines=3, dim=3, tau=1, hd=True, red=True,
             print("*****************************************************")
             print("*****************************************************")
             if draw:
-                Draw(uh, mesh, "vel")
+                Draw(Norm(uh), mesh, "vel")
                 input("view")
 
 
 ############### parameters
-dimList = [2]
-orderList = [2,4,6]
+dimList = [3]
+orderList = [2,3,4]
 tauList = [0, 1, 100]
 refines = 4
 
